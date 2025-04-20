@@ -17,13 +17,13 @@ def main_polygon_generation():
         return ccw(p1, p3, p4) != ccw(p2, p3, p4) and ccw(p1, p2, p3) != ccw(p1, p2, p4)
 
     def check_self_intersection(points):
-        edges = [(points[i], points[i + 1]) for i in range(len(points) - 1)]
-        edges.append((points[-1], points[0]))
+        if len(points) < 2:
+            return False
 
-        for (p1, p2), (p3, p4) in combinations(edges, 2):
-            if p2 == p3 or p1 == p4:
-                continue
-            if do_intersect(p1, p2, p3, p4):
+        new_edge = (points[-2], points[-1])
+        for i in range(len(points) - 3):
+            edge = (points[i], points[i + 1])
+            if do_intersect(edge[0], edge[1], new_edge[0], new_edge[1]):
                 return True
         return False
 
@@ -202,15 +202,6 @@ def draw_colored_graph(G, coloring):
         if node not in coloring:
             coloring[node] = 0
 
-    color_counts = {c: list(coloring.values()).count(c) for c in range(3)}
-    min_count = min(color_counts.values())
-    best_colors = [color_map[c] for c, count in color_counts.items() if count == min_count]
-
-    result_color_str = '/'.join(best_colors)
-    print(f"\nMinimum guards needed by Chvatal's theroem: {math.ceil(len(coloring)/3)}")
-    print(f"\nMinimum guards needed: {min_count}")
-    print(f"Guards should be placed at color(s): {result_color_str}")
-
     node_colors = [mcolors.to_rgba(color_map[coloring[n]], alpha=0.6) for n in G.nodes()]
     pos = nx.get_node_attributes(G, 'pos')
     plt.figure(figsize=(8, 8))
@@ -223,8 +214,56 @@ def color_triangulated_graph(triangles):
     draw_triangulated_graph(G)
     coloring = chvatal_3_coloring(G)
     draw_colored_graph(G, coloring)
+    return G, coloring
+
+def show_min_guard_positions(G, coloring):
+    import matplotlib.patches as mpatches
+
+    color_map = {0: 'Red', 1: 'Green', 2: 'Blue'}
+
+    # Fallback coloring
+    for node in G.nodes:
+        if node not in coloring:
+            coloring[node] = 0
+
+    # Determine best colors
+    color_counts = {c: list(coloring.values()).count(c) for c in range(3)}
+    min_count = min(color_counts.values())
+    best_colors = [c for c, count in color_counts.items() if count == min_count]
+
+    best_color_names = [color_map[c] for c in best_colors]
+    result_color_str = '/'.join(best_color_names)
+
+    pos = nx.get_node_attributes(G, 'pos')
+
+    # Assign colors for visualization
+    node_colors = []
+    for n in G.nodes():
+        c = coloring[n]
+        if c in best_colors:
+            node_colors.append(mcolors.to_rgba(color_map[c], alpha=0.8))
+        else:
+            node_colors.append(mcolors.to_rgba('gray', alpha=0.4))
+
+    plt.figure(figsize=(8, 8))
+    nx.draw(G, pos, node_color=node_colors, with_labels=True, edge_color='gray', node_size=500)
+
+    # Text box info
+    text = (
+        f"Minimum guards needed by Chvátal's theorem: {math.ceil(len(coloring)/3)}\n"
+        f"Actual minimum guards needed: {min_count}\n"
+        f"Guards should be placed at color(s): {result_color_str}"
+    )
+
+    plt.gcf().text(0.05, 0.01, text, fontsize=10, va='bottom', ha='left', bbox=dict(facecolor='white', alpha=0.7))
+    plt.title("Minimum Guard Positions Highlighted")
+    plt.show()
+
 
 if __name__ == "__main__":
     polygon_coords = main_polygon_generation()
     triangles = ear_clipping_triangulation(polygon_coords)
-    color_triangulated_graph(triangles)
+    G, coloring = color_triangulated_graph(triangles)
+    show_min_guard_positions(G, coloring)
+
+
