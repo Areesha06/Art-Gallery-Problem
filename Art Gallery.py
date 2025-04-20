@@ -7,19 +7,23 @@ from itertools import combinations
 
 # --- Polygon Generation Code ---
 def main_polygon_generation():
+    #list to store vertices
     p_vertices = []
     graph = nx.Graph()
 
+    # Helper function to check if two lines intersect
     def do_intersect(p1, p2, p3, p4):
         def ccw(a, b, c):
+            # Check if three points make a counter-clockwise turn
             return (c[1] - a[1]) * (b[0] - a[0]) > (b[1] - a[1]) * (c[0] - a[0])
-
+        # Uses counter clockwise method to determine intersection
         return ccw(p1, p3, p4) != ccw(p2, p3, p4) and ccw(p1, p2, p3) != ccw(p1, p2, p4)
 
+    # Determines whether a new edge would create an intersection
     def check_self_intersection(points):
         if len(points) < 2:
             return False
-
+        # Check the new edge against all previous edges except adjacent ones
         new_edge = (points[-2], points[-1])
         for i in range(len(points) - 3):
             edge = (points[i], points[i + 1])
@@ -28,11 +32,13 @@ def main_polygon_generation():
         return False
 
     def on_click(event):
+        # Ignores clicks outside the axes
         if event.xdata is None or event.ydata is None:
             return
 
         new_point = (float(round(event.xdata, 2)), float(round(event.ydata, 2)))
 
+        # Check if the user is closing the polygon by snapping near the first point
         if len(p_vertices) > 2:
             first_point = p_vertices[0]
             dist = math.sqrt((new_point[0] - first_point[0])**2 + (new_point[1] - first_point[1])**2)
@@ -41,18 +47,14 @@ def main_polygon_generation():
                 draw_polygon()
                 return p_vertices
 
-        for point in p_vertices:
-            dist = math.sqrt((new_point[0] - point[0])**2 + (new_point[1] - point[1])**2)
-            if dist < 0.3:
-                new_point = point
-                break
-
         p_vertices.append(new_point)
 
+        # Prevent self-intersecting polygons
         if len(p_vertices) > 2 and check_self_intersection(p_vertices):
             p_vertices.pop()
             return
 
+        # Clear and redraw updated canvas
         ax.cla()
         ax.set_xlim(0, 15)
         ax.set_ylim(0, 15)
@@ -61,36 +63,40 @@ def main_polygon_generation():
         x_vals = [pt[0] for pt in p_vertices]
         y_vals = [pt[1] for pt in p_vertices]
 
+        # Draws lines
         if len(p_vertices) > 1:
             ax.plot(x_vals, y_vals, 'k-')
 
+        # Scatter plots individual points
         ax.scatter(x_vals, y_vals, c='m', s=50)
 
+        # Updates canvas
         fig.canvas.draw()
         fig.canvas.flush_events()
 
     def draw_polygon():
         graph.clear()
-        unique_nodes = []
-        for i in p_vertices:
-            if i not in unique_nodes:
-                unique_nodes.append(i)
 
-        for i in range(len(unique_nodes)):
-            x, y = unique_nodes[i]
+        # Add nodes with their positions
+        for i in range(len(p_vertices)):
+            x, y = p_vertices[i]
             graph.add_node(i, pos=(x, y))
 
-        for i in range(len(unique_nodes) - 1):
+        # Connect nodes with edges
+        for i in range(len(p_vertices) - 1):
             graph.add_edge(i, i + 1)
-        graph.add_edge(len(unique_nodes) - 1, 0)
+        graph.add_edge(len(p_vertices) - 1, 0)
 
+        # Position mapping for drawing
         pos = nx.get_node_attributes(graph, 'pos')
 
+        # Clears previous plot and draw the final polygon
         plt.clf()
         nx.draw(graph, pos, with_labels=True, node_color='pink', edge_color='gray', node_size=500)
         plt.title("Final Drawn Polygon")
         plt.show()
-
+        
+    # Set up the Matplotlib figure and axes
     fig, ax = plt.subplots()
     ax.set_xlim(0, 15)
     ax.set_ylim(0, 15)
@@ -98,6 +104,7 @@ def main_polygon_generation():
 
     fig.canvas.mpl_connect("button_press_event", on_click)
     plt.show()
+    # Return the list of polygon vertices except the duplicate closing point
     return p_vertices[:-1]
 
 # --- Triangulation and Coloring Code ---
@@ -217,11 +224,11 @@ def color_triangulated_graph(triangles):
     return G, coloring
 
 def show_min_guard_positions(G, coloring):
-    import matplotlib.patches as mpatches
 
+    # Mapping from color index to color name
     color_map = {0: 'Red', 1: 'Green', 2: 'Blue'}
 
-    # Fallback coloring
+    # Ensure all nodes have a color assigned, otherwise assign red
     for node in G.nodes:
         if node not in coloring:
             coloring[node] = 0
@@ -241,10 +248,13 @@ def show_min_guard_positions(G, coloring):
     for n in G.nodes():
         c = coloring[n]
         if c in best_colors:
+            # Nodes with a "best" (minimum) color are highlighted brightly
             node_colors.append(mcolors.to_rgba(color_map[c], alpha=0.8))
         else:
+            # Others are grayed out to draw focus to optimal guard positions
             node_colors.append(mcolors.to_rgba('gray', alpha=0.4))
 
+    # Create the main plot for the graph
     plt.figure(figsize=(8, 8))
     nx.draw(G, pos, node_color=node_colors, with_labels=True, edge_color='gray', node_size=500)
 
@@ -255,6 +265,7 @@ def show_min_guard_positions(G, coloring):
         f"Guards should be placed at color(s): {result_color_str}"
     )
 
+    # Display the text box in the bottom-left of the figure
     plt.gcf().text(0.05, 0.01, text, fontsize=10, va='bottom', ha='left', bbox=dict(facecolor='white', alpha=0.7))
     plt.title("Minimum Guard Positions Highlighted")
     plt.show()
